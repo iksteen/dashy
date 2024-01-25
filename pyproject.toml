@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "dashy"
+version = "0.1.0"
+description = ""
+authors = ["Ingmar Steen <iksteen@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+inky = {version = "^1.5.0", extras = ["rpi"]}
+pillow = "^10.2.0"
+playwright = "^1.41.0"
+python-dotenv = "^1.0.1"
+aiohttp = {version = "^3.9.1", extras = ["speedups"]}
+aiojobs = "^1.2.1"
+spotify = "^0.10.2"
+beautifulsoup4 = "^4.12.3"
+
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.6.0"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["D", "FA100", "ANN101", "W191", "E111", "E114", "E117", "D206", "D300", "Q000", "Q001", "Q002", "COM812", "COM819", "ISC001", "ISC002"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
