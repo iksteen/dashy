@@ -1,15 +1,16 @@
 import asyncio
 import os
 from io import BytesIO
-from typing import AsyncGenerator, List
+from typing import List, Literal, Union
 
 import aiohttp
 import spotify
 from bs4 import BeautifulSoup
 from PIL import Image
-from playwright.async_api import Browser, Route
+from playwright.async_api import Browser, Playwright, Route
 from playwright.async_api import async_playwright as playwright
 
+from dashy.dashboards import Dashboard
 from dashy.displays import Display
 
 template = """
@@ -60,86 +61,106 @@ template = """
 """
 
 
-async def render_track(
-    display: Display,
-    session: aiohttp.ClientSession,
-    browser: Browser,
-    track: spotify.Track,
-    playlist_images: List[spotify.Image],
-) -> Image:
-    async def handle_cover(route: Route) -> None:
-        if route.request.url.endswith("/covers/playlist.png"):
-            image_set = playlist_images if playlist_images else track.album.images
-        elif route.request.url.endswith("/covers/album.png"):
-            image_set = track.album.images
-        else:
-            image_set = track.images
+class SpotifyDashboard(Dashboard):
+    display: Display
+    spotify: spotify.Client
+    spotify_user: spotify.models.User
+    session: aiohttp.ClientSession
+    playwright: Playwright
+    browser: Browser
 
-        if not image_set:
-            await route.fulfill(status=404)
-            return
+    min_interval = 1.0
 
-        async with session.get(image_set[0].url) as response:
-            status = response.status
-            data = await response.read()
-            content_type = response.headers.get("content-type")
+    def __init__(self) -> None:
+        self.last_track = None
 
-        await route.fulfill(status=status, body=data, content_type=content_type)
+    async def start(self, display: Display) -> None:
+        self.display = display
+        client_id = os.environ.get("SPOTIFY_CLIENT_ID")
+        client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET")
+        access_token = os.environ.get("SPOTIFY_ACCESS_TOKEN")
+        refresh_token = os.environ.get("SPOTIFY_REFRESH_TOKEN")
 
-    soup = BeautifulSoup(template, "html.parser")
-    soup.find(id="title").append(track.name)
-    soup.find(id="artist").append(track.artist.name)
+        self.spotify = spotify.Client(client_id, client_secret)
+        self.spotify_user = await spotify.models.User.from_token(
+            self.spotify, access_token, refresh_token
+        ).__aenter__()
+        self.session = aiohttp.ClientSession()
+        self.playwright = await playwright().start()
+        self.browser = await self.playwright.chromium.launch()
 
-    width, height = display.resolution
-    page = await browser.new_page(viewport={"width": width, "height": height})
-    try:
-        await page.route("http://localhost/covers/*.png", handle_cover)
-        await page.set_content(str(soup), wait_until="networkidle")
-        image_data = await page.screenshot()
-        return Image.open(BytesIO(image_data))
-    finally:
-        await page.close()
+    async def stop(self) -> None:
+        await self.browser.close()
+        await self.playwright.stop()
+        await self.session.close()
+        await self.spotify_user.__aexit__(None, None, None)
+        await self.spotify.close()
 
+    async def next(self, *, force: bool) -> Union[Literal["SKIP"], None, Image.Image]:
+        np = await self.spotify_user.currently_playing()
+        if np.get("is_playing") and np.get("currently_playing_type") == "track":
+            item = np["item"]
 
-async def spotify_dashboard(display: Display) -> AsyncGenerator[Image.Image, None]:
-    client_id = os.environ.get("SPOTIFY_CLIENT_ID")
-    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET")
-    access_token = os.environ.get("SPOTIFY_ACCESS_TOKEN")
-    refresh_token = os.environ.get("SPOTIFY_REFRESH_TOKEN")
+            if np.get("context") and np["context"].type == "playlist":
+                cover_images = await self.spotify_user.http.get_playlist_cover_image(
+                    np["context"].uri.split(":")[-1],
+                )
+                playlist_images = [
+                    spotify.models.Image(**image) for image in cover_images
+                ]
+            else:
+                playlist_images = []
 
-    async with spotify.Client(
-        client_id, client_secret
-    ) as client, spotify.User.from_token(
-        client, access_token, refresh_token
-    ) as user, aiohttp.ClientSession() as session, playwright() as p:
-        browser = await p.chromium.launch()
-        last_track = None
-        while True:
-            np = await user.currently_playing()
-            if np.get("currently_playing_type") == "track":
-                if np.get("context") and np["context"].type == "playlist":
-                    cover_images = await user.http.get_playlist_cover_image(
-                        np["context"].uri.split(":")[-1],
-                    )
-                    playlist_images = [
-                        spotify.models.Image(**image) for image in cover_images
-                    ]
-                else:
-                    playlist_images = []
-                item = np["item"]
-                if item.id != last_track:
-                    image = await render_track(
-                        display,
-                        session,
-                        browser,
-                        item,
-                        playlist_images,
-                    )
-                    last_track = item.id
+            if force or item.id != self.last_track:
+                image = await self.render_track(
+                    item,
+                    playlist_images,
+                )
+                self.last_track = item.id
 
-                    yield image
+                return image
+            return None
 
-            await asyncio.sleep(1)
+        self.last_track = None
+        return "SKIP"
+
+    async def render_track(
+        self,
+        track: spotify.models.Track,
+        playlist_images: List[spotify.models.Image],
+    ) -> Image:
+        async def handle_cover(route: Route) -> None:
+            if route.request.url == "http://localhost/covers/playlist.png":
+                image_set = playlist_images if playlist_images else track.album.images
+            elif route.request.url == "http://localhost/covers/album.png":
+                image_set = track.album.images
+            else:
+                image_set = track.images
+
+            if not image_set:
+                await route.fulfill(status=404)
+                return
+
+            async with self.session.get(image_set[0].url) as response:
+                status = response.status
+                data = await response.read()
+                content_type = response.headers.get("content-type")
+
+            await route.fulfill(status=status, body=data, content_type=content_type)
+
+        soup = BeautifulSoup(template, "html.parser")
+        soup.find(id="title").append(track.name)
+        soup.find(id="artist").append(track.artist.name)
+
+        width, height = self.display.resolution
+        page = await self.browser.new_page(viewport={"width": width, "height": height})
+        try:
+            await page.route("http://localhost/covers/*.png", handle_cover)
+            await page.set_content(str(soup), wait_until="networkidle")
+            image_data = await page.screenshot()
+            return Image.open(BytesIO(image_data))
+        finally:
+            await page.close()
 
 
 if __name__ == "__main__":
@@ -151,8 +172,10 @@ if __name__ == "__main__":
     display = SaveToDisk()
 
     async def main() -> None:
-        async for image in spotify_dashboard(display):
-            await display.show_image(image)
-            break
+        dashboard = SpotifyDashboard()
+        await dashboard.start(display)
+        image = await dashboard.next(force=True)
+        await display.show_image(image)
+        await dashboard.stop()
 
     asyncio.run(main())
