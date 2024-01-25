@@ -8,7 +8,8 @@ from dashy.displays.inky_auto import InkyAuto
 
 
 async def main(display: Display) -> None:
-    await spotify_dashboard(display)
+    async for image in spotify_dashboard(display):
+        await display.show_image(image)
 
 
 if __name__ == "__main__":

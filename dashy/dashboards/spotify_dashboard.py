@@ -1,7 +1,7 @@
 import asyncio
 import os
 from io import BytesIO
-from typing import List
+from typing import AsyncGenerator, List
 
 import aiohttp
 import spotify
@@ -92,14 +92,16 @@ async def render_track(
 
     width, height = display.resolution
     page = await browser.new_page(viewport={"width": width, "height": height})
-    await page.route("http://localhost/covers/*.png", handle_cover)
-    await page.set_content(str(soup), wait_until="networkidle")
-    image_data = await page.screenshot()
-    await page.close()
-    return Image.open(BytesIO(image_data))
+    try:
+        await page.route("http://localhost/covers/*.png", handle_cover)
+        await page.set_content(str(soup), wait_until="networkidle")
+        image_data = await page.screenshot()
+        return Image.open(BytesIO(image_data))
+    finally:
+        await page.close()
 
 
-async def spotify_dashboard(display: Display) -> None:
+async def spotify_dashboard(display: Display) -> AsyncGenerator[Image.Image, None]:
     client_id = os.environ.get("SPOTIFY_CLIENT_ID")
     client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET")
     access_token = os.environ.get("SPOTIFY_ACCESS_TOKEN")
@@ -111,7 +113,6 @@ async def spotify_dashboard(display: Display) -> None:
         client, access_token, refresh_token
     ) as user, aiohttp.ClientSession() as session, playwright() as p:
         browser = await p.chromium.launch()
-
         last_track = None
         while True:
             np = await user.currently_playing()
@@ -134,8 +135,9 @@ async def spotify_dashboard(display: Display) -> None:
                         item,
                         playlist_images,
                     )
-                    await display.show_image(image)
                     last_track = item.id
+
+                    yield image
 
             await asyncio.sleep(1)
 
@@ -147,4 +149,10 @@ if __name__ == "__main__":
 
     load_dotenv()
     display = SaveToDisk()
-    asyncio.run(spotify_dashboard(display))
+
+    async def main() -> None:
+        async for image in spotify_dashboard(display):
+            await display.show_image(image)
+            break
+
+    asyncio.run(main())
