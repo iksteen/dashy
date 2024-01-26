@@ -18,3 +18,4 @@ repos:
     - --allow-untyped-decorators
     additional_dependencies:
     - types-aiofiles
+    - types-requests
