@@ -14,16 +14,17 @@ playwright = "^1.41.0"
 python-dotenv = "^1.0.1"
 aiohttp = {version = "^3.9.1", extras = ["speedups"]}
 aiojobs = "^1.2.1"
-spotify = "^0.10.2"
 beautifulsoup4 = "^4.12.3"
-
+spotifyaio = {git = "https://github.com/iksteen/python-spotify.git", branch = "python39"}
+aiofiles = "^23.2.1"
+requests = "^2.31.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.0"
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["D", "PLR2004", "S112", "BLE001", "A003", "FA100", "ANN101", "W191", "E111", "E114", "E117", "D206", "D300", "Q000", "Q001", "Q002", "COM812", "COM819", "ISC001", "ISC002"]
+ignore = ["D", "UP007", "PLR2004", "S112", "BLE001", "A003", "FA100", "ANN101", "W191", "E111", "E114", "E117", "D206", "D300", "Q000", "Q001", "Q002", "COM812", "COM819", "ISC001", "ISC002"]
 
 [build-system]
 requires = ["poetry-core"]

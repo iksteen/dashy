@@ -1,13 +1,16 @@
-import abc
-from typing import Tuple
+from __future__ import annotations
 
-from PIL import Image
+import abc
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 
 class Display(abc.ABC):
     @property
     @abc.abstractmethod
-    def resolution(self) -> Tuple[int, int]:
+    def resolution(self) -> tuple[int, int]:
         ...
 
     @abc.abstractmethod

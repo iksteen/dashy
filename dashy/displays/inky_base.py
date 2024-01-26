@@ -1,14 +1,17 @@
+from __future__ import annotations
+
 import abc
 import asyncio
-from typing import Literal, Protocol, Tuple, Union
+from typing import TYPE_CHECKING, Literal, Protocol, Union
 
-from PIL import Image
+if TYPE_CHECKING:
+    from PIL import Image
 
 from dashy.displays import Display
 
 
 class InkyBaseDisplay(Protocol):
-    resolution: Tuple[int, int]
+    resolution: tuple[int, int]
 
     def show(self) -> None:
         ...
@@ -38,7 +41,7 @@ class InkyBase(Display):
         ...
 
     @property
-    def resolution(self) -> Tuple[int, int]:
+    def resolution(self) -> tuple[int, int]:
         return self.device.resolution
 
     async def show_image(self, image: Image) -> None:

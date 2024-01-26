@@ -1,17 +1,27 @@
-import asyncio
-import os
-from io import BytesIO
-from typing import List, Literal, Union
+from __future__ import annotations
 
+import asyncio
+import json
+import logging
+import time
+from io import BytesIO
+from typing import TYPE_CHECKING, Any, Literal, Union, cast
+
+import aiofiles
 import aiohttp
-import spotify
+from aiohttp import BasicAuth
 from bs4 import BeautifulSoup
 from PIL import Image
 from playwright.async_api import Browser, Playwright, Route
 from playwright.async_api import async_playwright as playwright
+from spotifyaio import SpotifyClient, Track
 
 from dashy.dashboards import Dashboard
-from dashy.displays import Display
+
+if TYPE_CHECKING:
+    from dashy.displays import Display
+
+logger = logging.getLogger(__name__)
 
 template = """
 <html>
@@ -21,7 +31,7 @@ template = """
                 width: 100%;
                 height: 100%;
                 margin: 0px;
-                background-image: url("http://localhost/covers/track.png");
+                background-image: url("http://localhost/cover.png");
                 background-size: cover;
                 background-position: center center;
                 font-family: sans-serif;
@@ -62,9 +72,9 @@ template = """
 
 
 class SpotifyDashboard(Dashboard):
+    credentials: dict[str, Any]
     display: Display
-    spotify: spotify.Client
-    spotify_user: spotify.models.User
+    spotify: SpotifyClient
     session: aiohttp.ClientSession
     playwright: Playwright
     browser: Browser
@@ -75,49 +85,68 @@ class SpotifyDashboard(Dashboard):
         self.last_track = None
 
     async def start(self, display: Display) -> None:
-        self.display = display
-        client_id = os.environ.get("SPOTIFY_CLIENT_ID")
-        client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET")
-        access_token = os.environ.get("SPOTIFY_ACCESS_TOKEN")
-        refresh_token = os.environ.get("SPOTIFY_REFRESH_TOKEN")
+        try:
+            async with aiofiles.open("spotify-credentials.json") as f:
+                self.credentials = json.loads(await f.read())
+        except (OSError, ValueError):
+            logger.exception("Invalid or missing spotify credentials")
+            self.credentials = {}
 
-        self.spotify = spotify.Client(client_id, client_secret)
-        self.spotify_user = await spotify.models.User.from_token(
-            self.spotify, access_token, refresh_token
-        ).__aenter__()
+        self.display = display
         self.session = aiohttp.ClientSession()
+        self.spotify = SpotifyClient(
+            session=self.session, refresh_token_function=self.get_token
+        )
         self.playwright = await playwright().start()
         self.browser = await self.playwright.chromium.launch()
 
     async def stop(self) -> None:
         await self.browser.close()
         await self.playwright.stop()
-        await self.session.close()
-        await self.spotify_user.__aexit__(None, None, None)
         await self.spotify.close()
+        await self.session.close()
+
+    async def get_token(self) -> str:
+        if self.credentials["expires"] < time.time():
+            async with self.session.post(
+                "https://accounts.spotify.com/api/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": self.credentials["refresh_token"],
+                },
+                auth=BasicAuth(
+                    self.credentials["client_id"], self.credentials["client_secret"]
+                ),
+            ) as r:
+                if not r.ok:
+                    error = await r.text()
+                    logger.error("Failed to refresh token: %s", error)
+                    self.credentials["access_token"] = ""
+                else:
+                    credentials = await r.json()
+                    self.credentials["expires"] = (
+                        time.time() + credentials["expires_in"]
+                    )
+                    self.credentials["access_token"] = credentials["access_token"]
+                    if "refresh_token" in credentials:
+                        self.credentials["refresh_token"] = credentials["refresh_token"]
+
+                async with aiofiles.open("spotify-credentials.json", "w") as f:
+                    await f.write(json.dumps(self.credentials))
+
+        return cast(str, self.credentials["access_token"])
 
     async def next(self, *, force: bool) -> Union[Literal["SKIP"], None, Image.Image]:
-        np = await self.spotify_user.currently_playing()
-        if np.get("is_playing") and np.get("currently_playing_type") == "track":
-            item = np["item"]
+        if not self.credentials.get("access_token"):
+            return "SKIP"
 
-            if np.get("context") and np["context"].type == "playlist":
-                cover_images = await self.spotify_user.http.get_playlist_cover_image(
-                    np["context"].uri.split(":")[-1],
-                )
-                playlist_images = [
-                    spotify.models.Image(**image) for image in cover_images
-                ]
-            else:
-                playlist_images = []
-
-            if force or item.id != self.last_track:
+        np = await self.spotify.get_current_playing()
+        if np is not None and np.is_playing and np.currently_playing_type == "track":
+            if force or np.item.uri != self.last_track:
                 image = await self.render_track(
-                    item,
-                    playlist_images,
+                    np.item,
                 )
-                self.last_track = item.id
-
+                self.last_track = np.item.uri
                 return image
             return None
 
@@ -126,22 +155,14 @@ class SpotifyDashboard(Dashboard):
 
     async def render_track(
         self,
-        track: spotify.models.Track,
-        playlist_images: List[spotify.models.Image],
+        track: Track,
     ) -> Image:
         async def handle_cover(route: Route) -> None:
-            if route.request.url == "http://localhost/covers/playlist.png":
-                image_set = playlist_images if playlist_images else track.album.images
-            elif route.request.url == "http://localhost/covers/album.png":
-                image_set = track.album.images
-            else:
-                image_set = track.images
-
-            if not image_set:
+            if not track.album.images:
                 await route.fulfill(status=404)
                 return
 
-            async with self.session.get(image_set[0].url) as response:
+            async with self.session.get(track.album.images[0].url) as response:
                 status = response.status
                 data = await response.read()
                 content_type = response.headers.get("content-type")
@@ -150,12 +171,14 @@ class SpotifyDashboard(Dashboard):
 
         soup = BeautifulSoup(template, "html.parser")
         soup.find(id="title").append(track.name)
-        soup.find(id="artist").append(track.artist.name)
+        soup.find(id="artist").append(
+            ", ".join(artist.name for artist in track.artists)
+        )
 
         width, height = self.display.resolution
         page = await self.browser.new_page(viewport={"width": width, "height": height})
         try:
-            await page.route("http://localhost/covers/*.png", handle_cover)
+            await page.route("http://localhost/cover.png", handle_cover)
             await page.set_content(str(soup), wait_until="networkidle")
             image_data = await page.screenshot()
             return Image.open(BytesIO(image_data))

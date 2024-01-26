@@ -1,5 +1,6 @@
 import asyncio
 import importlib
+import logging
 import math
 import os
 
@@ -47,6 +48,9 @@ async def main(display: Display) -> None:
 
 if __name__ == "__main__":
     load_dotenv()
+
+    loglevel = os.environ.get("DASHY_LOGLEVEL", "INFO")
+    logging.basicConfig(level=getattr(logging, loglevel))
 
     display_path = os.environ.get("DASHY_DISPLAY", "dashy.displays.inky_auto.InkyAuto")
     display_module_name, display_class_name = display_path.rsplit(".", 1)

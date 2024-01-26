@@ -22,3 +22,8 @@ Install dependencies for playwright:
 sudo .venv/bin/playwright install-deps
 .venv/bin/playwright install chromium
 ```
+
+Register a new spotify application, and do a little dance to create the credentials file:
+```
+.venv/bin/python spotify-dance.py
+```

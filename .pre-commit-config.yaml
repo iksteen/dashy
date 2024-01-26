@@ -16,3 +16,5 @@ repos:
     - --strict-optional
     - --allow-subclassing-any
     - --allow-untyped-decorators
+    additional_dependencies:
+    - types-aiofiles
