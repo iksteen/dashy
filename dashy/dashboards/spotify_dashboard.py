@@ -5,7 +5,7 @@ import json
 import logging
 import time
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Literal, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
 import aiofiles
 import aiohttp
@@ -14,7 +14,6 @@ from bs4 import BeautifulSoup
 from PIL import Image
 from playwright.async_api import Browser, Playwright, Route
 from playwright.async_api import async_playwright as playwright
-from spotifyaio import SpotifyClient, Track
 
 from dashy.dashboards import Dashboard
 
@@ -74,7 +73,6 @@ template = """
 class SpotifyDashboard(Dashboard):
     credentials: dict[str, Any]
     display: Display
-    spotify: SpotifyClient
     session: aiohttp.ClientSession
     playwright: Playwright
     browser: Browser
@@ -82,7 +80,7 @@ class SpotifyDashboard(Dashboard):
     min_interval = 1.0
 
     def __init__(self) -> None:
-        self.last_track = None
+        self.last_id = None
 
     async def start(self, display: Display) -> None:
         try:
@@ -94,16 +92,12 @@ class SpotifyDashboard(Dashboard):
 
         self.display = display
         self.session = aiohttp.ClientSession()
-        self.spotify = SpotifyClient(
-            session=self.session, refresh_token_function=self.get_token
-        )
         self.playwright = await playwright().start()
         self.browser = await self.playwright.chromium.launch()
 
     async def stop(self) -> None:
         await self.browser.close()
         await self.playwright.stop()
-        await self.spotify.close()
         await self.session.close()
 
     async def get_token(self) -> str:
@@ -136,44 +130,80 @@ class SpotifyDashboard(Dashboard):
 
         return cast(str, self.credentials["access_token"])
 
+    async def request(
+        self,
+        method: str,
+        path: str,
+    ) -> Optional[dict[str, Any]]:
+        url = f"https://api.spotify.com{path}"
+        token = await self.get_token()
+        if not token:
+            logger.error("No access token, aborting.")
+            return None
+
+        async with await self.session.request(
+            method,
+            url,
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
+            raise_for_status=True,
+        ) as r:
+            if r.status == 204:
+                return None
+            return cast(dict[str, Any], await r.json())
+
     async def next(self, *, force: bool) -> Union[Literal["SKIP"], None, Image.Image]:
         if not self.credentials.get("access_token"):
             return "SKIP"
 
-        np = await self.spotify.get_current_playing()
-        if np is not None and np.is_playing and np.currently_playing_type == "track":
-            if force or np.item.uri != self.last_track:
-                image = await self.render_track(
-                    np.item,
-                )
-                self.last_track = np.item.uri
+        np = await self.request(
+            "GET", "/v1/me/player/currently-playing?additional_types=track,episode"
+        )
+        if (
+            np is not None
+            and np["is_playing"]
+            and np["currently_playing_type"] in ("track", "episode")
+        ):
+            if force or np["item"]["id"] != self.last_id:
+                image = await self.render_item(np["item"])
+                self.last_id = np["item"]["id"]
                 return image
             return None
 
-        self.last_track = None
+        self.last_id = None
         return "SKIP"
 
-    async def render_track(
+    async def render_item(
         self,
-        track: Track,
+        item: dict[str, Any],
     ) -> Image:
         async def handle_cover(route: Route) -> None:
-            if not track.album.images:
+            if item["type"] == "episode":
+                image_set = item["images"]
+            else:
+                image_set = item["album"]["images"]
+
+            if not image_set:
                 await route.fulfill(status=404)
                 return
 
-            async with self.session.get(track.album.images[0].url) as response:
-                status = response.status
-                data = await response.read()
-                content_type = response.headers.get("content-type")
+            async with self.session.get(image_set[0]["url"]) as r:
+                status = r.status
+                data = await r.read()
+                content_type = r.headers.get("content-type")
 
             await route.fulfill(status=status, body=data, content_type=content_type)
 
+        if item["type"] == "episode":
+            artist = item["show"]["name"]
+        else:
+            artist = ", ".join(artist["name"] for artist in item["artists"])
+
         soup = BeautifulSoup(template, "html.parser")
-        soup.find(id="title").append(track.name)
-        soup.find(id="artist").append(
-            ", ".join(artist.name for artist in track.artists)
-        )
+        soup.find(id="title").append(item["name"])
+        soup.find(id="artist").append(artist)
 
         width, height = self.display.resolution
         page = await self.browser.new_page(viewport={"width": width, "height": height})

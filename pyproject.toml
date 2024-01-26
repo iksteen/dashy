@@ -15,7 +15,6 @@ python-dotenv = "^1.0.1"
 aiohttp = {version = "^3.9.1", extras = ["speedups"]}
 aiojobs = "^1.2.1"
 beautifulsoup4 = "^4.12.3"
-spotifyaio = {git = "https://github.com/iksteen/python-spotify.git", branch = "python39"}
 aiofiles = "^23.2.1"
 requests = "^2.31.0"
 
