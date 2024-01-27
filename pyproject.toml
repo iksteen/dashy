@@ -17,13 +17,17 @@ aiojobs = "^1.2.1"
 beautifulsoup4 = "^4.12.3"
 aiofiles = "^23.2.1"
 requests = "^2.31.0"
+typing-extensions = "^4.9.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.6.0"
 
+[tool.ruff]
+extend-exclude = ["vendor"]
+
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["D", "S102", "UP007", "PLR2004", "S112", "BLE001", "A003", "FA100", "ANN101", "W191", "E111", "E114", "E117", "D206", "D300", "Q000", "Q001", "Q002", "COM812", "COM819", "ISC001", "ISC002"]
+ignore = ["D", "PGH003", "ANN401", "S102", "UP007", "PLR2004", "S112", "BLE001", "A003", "FA100", "ANN101", "W191", "E111", "E114", "E117", "D206", "D300", "Q000", "Q001", "Q002", "COM812", "COM819", "ISC001", "ISC002"]
 
 [build-system]
 requires = ["poetry-core"]

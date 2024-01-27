@@ -4,6 +4,8 @@ import abc
 import asyncio
 from typing import TYPE_CHECKING, Literal, Protocol, Union
 
+from dashy.sensors.gpio_button import GPIOButton
+
 if TYPE_CHECKING:
     from PIL import Image
 
@@ -35,6 +37,16 @@ InkyDisplay = Union[InkyMonoDisplay, InkyColourDisplay]
 
 
 class InkyBase(Display):
+    def __init__(self, *, saturation: float = 0.75) -> None:
+        self.saturation = saturation
+
+        self.buttons = {
+            "A": GPIOButton(5),
+            "B": GPIOButton(6),
+            "C": GPIOButton(16),
+            "D": GPIOButton(24),
+        }
+
     @property
     @abc.abstractmethod
     def device(self) -> InkyDisplay:
@@ -47,7 +59,7 @@ class InkyBase(Display):
     async def show_image(self, image: Image) -> None:
         def render_image() -> None:
             if self.device.colour == "multi":
-                self.device.set_image(image, saturation=0.75)
+                self.device.set_image(image, saturation=self.saturation)
             else:
                 self.device.set_image(image)
             self.device.show()
