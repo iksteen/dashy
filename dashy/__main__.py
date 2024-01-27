@@ -1,25 +1,25 @@
+from __future__ import annotations
+
 import asyncio
-import importlib
 import logging
 import math
-import os
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
 
-from dashy.dashboards.slideshow_dashboard import SlideshowDashboard
-from dashy.dashboards.spotify_dashboard import SpotifyDashboard
-from dashy.displays import Display
-
-DASHBOARDS = [SpotifyDashboard(), SlideshowDashboard()]
+if TYPE_CHECKING:
+    from dashy.dashboards import Dashboard
+    from dashy.displays import Display
 
 
-async def main(display: Display) -> None:
-    dashboards = []
-
+async def main(display: Display, dashboards: list[Dashboard]) -> None:
+    started_dashboards = []
     try:
-        for dashboard in DASHBOARDS:
+        for dashboard in dashboards:
             await dashboard.start(display)
-            dashboards.append(dashboard)
+            started_dashboards.append(dashboard)
 
         last_dashboard = None
 
@@ -42,20 +42,23 @@ async def main(display: Display) -> None:
             await asyncio.sleep(pause_time)
 
     finally:
-        for dashboard in reversed(dashboards):
+        for dashboard in reversed(started_dashboards):
             await dashboard.stop()
 
 
 if __name__ == "__main__":
     load_dotenv()
 
-    loglevel = os.environ.get("DASHY_LOGLEVEL", "INFO")
-    logging.basicConfig(level=getattr(logging, loglevel))
+    config_path = sys.argv[1] if len(sys.argv) > 1 else "conf.py"
+    with Path(config_path).open("r") as f:
+        content = f.read()
+    conf_globals: dict[str, Any] = {}
+    exec(content, conf_globals)
 
-    display_path = os.environ.get("DASHY_DISPLAY", "dashy.displays.inky_auto.InkyAuto")
-    display_module_name, display_class_name = display_path.rsplit(".", 1)
-    display_module = importlib.import_module(display_module_name)
-    display_class = getattr(display_module, display_class_name)
-    display = display_class()
+    loglevel = conf_globals.get("LOGLEVEL", logging.INFO)
+    logging.basicConfig(level=loglevel)
 
-    asyncio.run(main(display))
+    display = conf_globals["DISPLAY"]
+    dashboards = conf_globals["DASHBOARDS"]
+
+    asyncio.run(main(display, dashboards))

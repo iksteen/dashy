@@ -1,0 +1,14 @@
+import logging
+
+from dashy.dashboards.slideshow_dashboard import SlideshowDashboard
+from dashy.dashboards.spotify_dashboard import SpotifyDashboard
+from dashy.displays.inky_auto import InkyAuto
+
+LOGLEVEL = logging.INFO
+
+DISPLAY = InkyAuto()
+
+DASHBOARDS = [
+    SpotifyDashboard(),
+    SlideshowDashboard(),
+]

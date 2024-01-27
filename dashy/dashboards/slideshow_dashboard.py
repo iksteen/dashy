@@ -9,7 +9,8 @@ from PIL import Image
 from dashy.dashboards import Dashboard
 from dashy.displays import Display
 
-INTERVAL = 3600
+DEFAULT_INTERVAL = 3600.0
+DEFAULT_PATH = Path.home() / "Pictures"
 
 
 class SlideshowDashboard(Dashboard):
@@ -17,10 +18,21 @@ class SlideshowDashboard(Dashboard):
 
     last_update = None
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        path: Union[Path, str] = DEFAULT_PATH,
+        interval: float = DEFAULT_INTERVAL,
+        mode: Literal["FIT", "COVER"] = "FIT",
+    ) -> None:
+        if isinstance(path, str):
+            path = Path(path).expanduser()
+        self.interval = interval
+        self.mode = mode
+
         self.file_list = []
 
-        for file in (Path.home() / "Pictures").iterdir():
+        for file in path.iterdir():
             if file.is_file():
                 try:
                     im = Image.open(file)
@@ -43,15 +55,15 @@ class SlideshowDashboard(Dashboard):
             return math.inf
 
         if self.last_update is None:
-            return INTERVAL
+            return self.interval
 
-        return max(0, int(INTERVAL - (time.time() - self.last_update)))
+        return max(0.0, self.interval - (time.time() - self.last_update))
 
     async def next(self, *, force: bool) -> Union[Literal["SKIP"], None, Image.Image]:
         if not self.file_list:
             return "SKIP"
 
-        if force or self.min_interval == 0:
+        if force or self.min_interval == 0.0:
             image_path = self.file_list.pop(0)
             self.file_list.append(image_path)
             self.last_update = time.time()
@@ -60,10 +72,18 @@ class SlideshowDashboard(Dashboard):
 
             im = Image.open(image_path)
 
-            if im.width / im.height >= canvas.width / canvas.height:
-                rescale_ratio = canvas.width / im.width
+            if self.mode == "FIT":
+                rescale_ratio = (
+                    canvas.width / im.width
+                    if im.width / im.height >= canvas.width / canvas.height
+                    else canvas.height / im.height
+                )
             else:
-                rescale_ratio = canvas.height / im.height
+                rescale_ratio = (
+                    canvas.height / im.height
+                    if im.width / im.height >= canvas.width / canvas.height
+                    else canvas.width / im.width
+                )
 
             new_width = int(im.width * rescale_ratio)
             new_height = int(im.height * rescale_ratio)

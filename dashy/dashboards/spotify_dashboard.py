@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-template = """
+DEFAULT_TEMPLATE = """
 <html>
     <head>
         <style type="text/css">
@@ -79,12 +79,21 @@ class SpotifyDashboard(Dashboard):
 
     min_interval = 1.0
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        credentials: str = "spotify-credentials.json",
+        interval: float = 1.0,
+        template: str = DEFAULT_TEMPLATE,
+    ) -> None:
+        self.credential_path = credentials
+        self.min_interval = interval
+        self.template = template
         self.last_id = None
 
     async def start(self, display: Display) -> None:
         try:
-            async with aiofiles.open("spotify-credentials.json") as f:
+            async with aiofiles.open(self.credential_path) as f:
                 self.credentials = json.loads(await f.read())
         except (OSError, ValueError):
             logger.exception("Invalid or missing spotify credentials")
@@ -125,7 +134,7 @@ class SpotifyDashboard(Dashboard):
                     if "refresh_token" in credentials:
                         self.credentials["refresh_token"] = credentials["refresh_token"]
 
-                async with aiofiles.open("spotify-credentials.json", "w") as f:
+                async with aiofiles.open(self.credential_path, "w") as f:
                     await f.write(json.dumps(self.credentials))
 
         return cast(str, self.credentials["access_token"])
@@ -201,7 +210,7 @@ class SpotifyDashboard(Dashboard):
         else:
             artist = ", ".join(artist["name"] for artist in item["artists"])
 
-        soup = BeautifulSoup(template, "html.parser")
+        soup = BeautifulSoup(self.template, "html.parser")
         soup.find(id="title").append(item["name"])
         soup.find(id="artist").append(artist)
 
