@@ -7,6 +7,7 @@ from PIL import Image
 
 from dashy.dashboards import Dashboard
 from dashy.displays import Display
+from dashy.utils import resize_image
 
 DEFAULT_INTERVAL = 3600
 DEFAULT_PATH = Path.home() / "Pictures"
@@ -67,37 +68,10 @@ class SlideshowDashboard(Dashboard):
                 self.file_list.append(self.file_list.pop(0))
                 self.last_update = time.time()
 
-            image_path = self.file_list[0]
-
-            canvas = Image.new("RGBA", self.display.resolution)
-
-            im = Image.open(image_path)
-
-            if self.mode == "FIT":
-                rescale_ratio = (
-                    canvas.width / im.width
-                    if im.width / im.height >= canvas.width / canvas.height
-                    else canvas.height / im.height
-                )
-            else:
-                rescale_ratio = (
-                    canvas.height / im.height
-                    if im.width / im.height >= canvas.width / canvas.height
-                    else canvas.width / im.width
-                )
-
-            new_width = int(im.width * rescale_ratio)
-            new_height = int(im.height * rescale_ratio)
-
-            new_im = im.resize((new_width, new_height))
-
-            x_offset = int((canvas.width - new_width) / 2)
-            y_offset = int((canvas.height - new_height) / 2)
-
-            canvas.paste(new_im, (x_offset, y_offset))
-
-            new_im.close()
-            im.close()
-            return canvas
+            im = Image.open(self.file_list[0])
+            try:
+                return resize_image(im, self.display.resolution, mode=self.mode)
+            finally:
+                im.close()
 
         return None
