@@ -64,7 +64,7 @@ class WeatherDashboard(Dashboard):
             )
             im = Image.open(BytesIO(image_data))
             try:
-                return resize_image(im, self.display.resolution)
+                return resize_image(im, self.display.resolution, mode="COVER")
             finally:
                 im.close()
         finally:
