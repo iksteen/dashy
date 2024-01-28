@@ -20,16 +20,16 @@ async def main(display: Display, dashboards: list[Dashboard]) -> None:
 
         started_dashboards = []
         try:
-            for dashboard in dashboards:
-                await dashboard.start(display)
-                started_dashboards.append(dashboard)
-
             last_dashboard = None
 
             while True:
                 pause_time = math.inf
 
                 for dashboard in dashboards:
+                    if dashboard not in started_dashboards:
+                        await dashboard.start(display)
+                        started_dashboards.append(dashboard)
+
                     pause_time = min(pause_time, dashboard.min_interval)
                     result = await dashboard.next(force=last_dashboard is not dashboard)
                     if result == "SKIP":
