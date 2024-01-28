@@ -1,15 +1,14 @@
-import math
 import random
 import time
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal, Optional, Union
 
 from PIL import Image
 
 from dashy.dashboards import Dashboard
 from dashy.displays import Display
 
-DEFAULT_INTERVAL = 3600.0
+DEFAULT_INTERVAL = 3600
 DEFAULT_PATH = Path.home() / "Pictures"
 
 
@@ -22,7 +21,7 @@ class SlideshowDashboard(Dashboard):
         self,
         *,
         path: Union[Path, str] = DEFAULT_PATH,
-        interval: float = DEFAULT_INTERVAL,
+        interval: int = DEFAULT_INTERVAL,
         mode: Literal["FIT", "COVER"] = "FIT",
     ) -> None:
         if isinstance(path, str):
@@ -50,23 +49,25 @@ class SlideshowDashboard(Dashboard):
         pass
 
     @property
-    def min_interval(self) -> float:
+    def min_interval(self) -> Optional[int]:
         if len(self.file_list) < 2:
-            return math.inf
+            return None
 
         if self.last_update is None:
-            return self.interval
+            return 0
 
-        return max(0.0, self.interval - (time.time() - self.last_update))
+        return max(0, self.interval - int(time.time() - self.last_update))
 
     async def next(self, *, force: bool) -> Union[Literal["SKIP"], None, Image.Image]:
         if not self.file_list:
             return "SKIP"
 
-        if force or self.min_interval == 0.0:
-            image_path = self.file_list.pop(0)
-            self.file_list.append(image_path)
-            self.last_update = time.time()
+        if force or self.min_interval == 0:
+            if self.min_interval == 0:
+                self.file_list.append(self.file_list.pop(0))
+                self.last_update = time.time()
+
+            image_path = self.file_list[0]
 
             canvas = Image.new("RGBA", self.display.resolution)
 

@@ -46,10 +46,13 @@ class Dashy:
                         await dashboard.start(display)
                         started_dashboards.append(dashboard)
 
-                    pause_time = min(pause_time, dashboard.min_interval)
                     result = await dashboard.next(
                         force=self.last_dashboard is not dashboard
                     )
+                    min_interval = dashboard.min_interval
+                    if min_interval is not None:
+                        pause_time = min(pause_time, min_interval)
+
                     if result == "SKIP":
                         continue
 

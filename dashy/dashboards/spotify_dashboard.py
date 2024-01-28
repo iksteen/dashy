@@ -77,13 +77,13 @@ class SpotifyDashboard(Dashboard):
     playwright: Playwright
     browser: Browser
 
-    min_interval = 1.0
+    min_interval = 1
 
     def __init__(
         self,
         *,
         credentials: str = "spotify-credentials.json",
-        interval: float = 1.0,
+        interval: int = 1,
         template: str = DEFAULT_TEMPLATE,
     ) -> None:
         self.credential_path = credentials

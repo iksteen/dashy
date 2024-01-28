@@ -1,5 +1,5 @@
 import abc
-from typing import Literal, Union
+from typing import Literal, Optional, Union
 
 from PIL import Image
 
@@ -17,7 +17,7 @@ class Dashboard(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def min_interval(self) -> float:
+    def min_interval(self) -> Optional[int]:
         ...
 
     @abc.abstractmethod
