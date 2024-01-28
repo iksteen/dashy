@@ -15,35 +15,40 @@ if TYPE_CHECKING:
 
 
 async def main(display: Display, dashboards: list[Dashboard]) -> None:
-    started_dashboards = []
     try:
-        for dashboard in dashboards:
-            await dashboard.start(display)
-            started_dashboards.append(dashboard)
+        await display.start()
 
-        last_dashboard = None
-
-        while True:
-            pause_time = math.inf
-
+        started_dashboards = []
+        try:
             for dashboard in dashboards:
-                pause_time = min(pause_time, dashboard.min_interval)
-                result = await dashboard.next(force=last_dashboard is not dashboard)
-                if result == "SKIP":
-                    continue
+                await dashboard.start(display)
+                started_dashboards.append(dashboard)
 
-                last_dashboard = dashboard
-                if result is not None:
-                    await display.show_image(result)
-                break
-            else:
-                last_dashboard = None
+            last_dashboard = None
 
-            await asyncio.sleep(pause_time)
+            while True:
+                pause_time = math.inf
 
+                for dashboard in dashboards:
+                    pause_time = min(pause_time, dashboard.min_interval)
+                    result = await dashboard.next(force=last_dashboard is not dashboard)
+                    if result == "SKIP":
+                        continue
+
+                    last_dashboard = dashboard
+                    if result is not None:
+                        await display.show_image(result)
+                    break
+                else:
+                    last_dashboard = None
+
+                await asyncio.sleep(pause_time)
+
+        finally:
+            for dashboard in reversed(started_dashboards):
+                await dashboard.stop()
     finally:
-        for dashboard in reversed(started_dashboards):
-            await dashboard.stop()
+        await display.stop()
 
 
 if __name__ == "__main__":

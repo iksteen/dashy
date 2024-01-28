@@ -14,28 +14,33 @@ class GPIOButton(Button):
 
     def __init__(self, gpio: int) -> None:
         self.gpio = gpio
-        self.registered = False
+        self.cancel: Optional[Callable[[], Awaitable[None]]] = None
         self.callbacks: list[ButtonCallback] = []
 
-    async def register(self, f: Callable[[], Awaitable[None]]) -> None:
+    async def start(self) -> None:
         if GPIOButton.pi is None:
             GPIOButton.pi = asyncpio.pi()  # type: ignore
             await GPIOButton.pi.connect()
 
-        if not self.registered:
-            await GPIOButton.pi.set_mode(self.gpio, asyncpio.INPUT)  # type: ignore
-            await GPIOButton.pi.set_pull_up_down(self.gpio, asyncpio.PUD_UP)  # type: ignore
-            await GPIOButton.pi.callback(
-                self.gpio,
-                edge=asyncpio.RISING_EDGE,  # type: ignore
-                func=self.emit,
-            )
-            self.registered = True
+        await GPIOButton.pi.set_mode(self.gpio, asyncpio.INPUT)  # type: ignore
+        await GPIOButton.pi.set_pull_up_down(self.gpio, asyncpio.PUD_UP)  # type: ignore
+        callback = await GPIOButton.pi.callback(
+            self.gpio,
+            edge=asyncpio.RISING_EDGE,  # type: ignore
+            func=self.emit,
+        )
+        self.cancel = callback.cancel
 
+    async def stop(self) -> None:
+        if self.cancel:
+            await self.cancel()
+        self.cancel = None
+
+    def register(self, f: Callable[[], Awaitable[None]]) -> None:
         if f not in self.callbacks:
             self.callbacks.append(f)
 
-    async def unregister(self, f: ButtonCallback) -> None:
+    def unregister(self, f: ButtonCallback) -> None:
         if f in self.callbacks:
             self.callbacks.remove(f)
 

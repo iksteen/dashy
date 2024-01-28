@@ -8,6 +8,12 @@ if TYPE_CHECKING:
 
 
 class Display(abc.ABC):
+    async def start(self) -> None:  # noqa: B027
+        pass
+
+    async def stop(self) -> None:  # noqa: B027
+        pass
+
     @property
     @abc.abstractmethod
     def resolution(self) -> tuple[int, int]:

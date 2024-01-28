@@ -47,6 +47,16 @@ class InkyBase(Display):
             "D": GPIOButton(24),
         }
 
+    async def start(self) -> None:
+        await super().start()
+        for button in self.buttons.values():
+            await button.start()
+
+    async def stop(self) -> None:
+        await super().stop()
+        for button in self.buttons.values():
+            await button.stop()
+
     @property
     @abc.abstractmethod
     def device(self) -> InkyDisplay:
