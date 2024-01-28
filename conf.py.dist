@@ -6,9 +6,9 @@ from dashy.displays.inky_auto import InkyAuto
 
 LOGLEVEL = logging.INFO
 
-DISPLAY = InkyAuto()
+DASHY.display = InkyAuto()
 
-DASHBOARDS = [
+DASHY.dashboards = [
     SpotifyDashboard(),
     SlideshowDashboard(),
 ]
