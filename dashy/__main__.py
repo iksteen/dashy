@@ -21,6 +21,7 @@ class Dashy:
         self.sleep_task: Optional[asyncio.Task[None]] = None
         self.last_dashboard: Optional[Dashboard] = None
         self.dashboards: list[Dashboard] = []
+        self.skip_sleep = False
 
     async def run(self) -> None:
         if self.display is None:
@@ -63,10 +64,13 @@ class Dashy:
                 else:
                     self.last_dashboard = None
 
-                self.sleep_task = asyncio.create_task(asyncio.sleep(pause_time))
-                with suppress(asyncio.CancelledError):
-                    await self.sleep_task
-                self.sleep_task = None
+                if not self.skip_sleep:
+                    self.sleep_task = asyncio.create_task(asyncio.sleep(pause_time))
+                    with suppress(asyncio.CancelledError):
+                        await self.sleep_task
+                    self.sleep_task = None
+                else:
+                    self.skip_sleep = False
 
         finally:
             for dashboard in reversed(started_dashboards):
@@ -78,6 +82,8 @@ class Dashy:
 
         if self.sleep_task is not None:
             self.sleep_task.cancel()
+        else:
+            self.skip_sleep = True
 
 
 if __name__ == "__main__":
