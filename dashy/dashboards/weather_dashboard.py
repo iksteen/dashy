@@ -9,7 +9,7 @@ from playwright.async_api import Browser, Playwright
 from playwright.async_api import async_playwright as playwright
 
 from dashy.dashboards import Dashboard
-from dashy.utils import resize_image
+from dashy.utils.resize_image import resize_image
 
 if TYPE_CHECKING:
     from dashy.displays import Display

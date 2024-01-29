@@ -7,7 +7,7 @@ from PIL import Image
 
 from dashy.dashboards import Dashboard
 from dashy.displays import Display
-from dashy.utils import resize_image
+from dashy.utils.resize_image import resize_image
 
 DEFAULT_INTERVAL = 3600
 DEFAULT_PATH = Path.home() / "Pictures"
