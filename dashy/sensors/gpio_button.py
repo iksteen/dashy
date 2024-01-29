@@ -36,7 +36,7 @@ class GPIOButton(Button):
             await self.cancel()
         self.cancel = None
 
-    def register(self, f: Callable[[], Awaitable[None]]) -> None:
+    def register(self, f: ButtonCallback) -> None:
         if f not in self.callbacks:
             self.callbacks.append(f)
 
