@@ -23,11 +23,12 @@ class WeatherDashboard(Dashboard):
     playwright: Playwright
     browser: Browser
 
-    def __init__(self, *, location: Optional[str] = None) -> None:
+    def __init__(self, *, location: Optional[str] = None, interval: int = 3600) -> None:
         if location:
             self.template = TEMPLATE_LOC.replace("***LOCATION***", location)
         else:
             self.template = TEMPLATE_AUTO
+        self.interval = interval
 
         self.next_update: Optional[int] = None
 
@@ -45,15 +46,15 @@ class WeatherDashboard(Dashboard):
         if self.next_update is None:
             return 0
 
-        return max(0, int(self.next_update - time.time()))
+        return max(0, self.next_update - int(time.time()))
 
     async def next(self, *, force: bool) -> Union[Literal["SKIP"], None, Image.Image]:
         now = int(time.time())
 
-        if not (force or self.next_update is None or now - self.next_update >= 0):
+        if not (force or self.next_update is None or self.next_update < now):
             return None
 
-        self.next_update = now - now % 3600 + 3600
+        self.next_update = now - now % self.interval + self.interval
 
         width, height = self.display.resolution
         page = await self.browser.new_page(viewport={"width": width, "height": height})
