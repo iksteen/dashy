@@ -12,3 +12,7 @@ class Button(ABC):
     @abstractmethod
     def unregister(self, f: ButtonCallback) -> None:
         ...
+
+    def __call__(self, f: ButtonCallback) -> ButtonCallback:
+        self.register(f)
+        return f
