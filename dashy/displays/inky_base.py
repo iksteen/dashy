@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import abc
 import asyncio
 from typing import TYPE_CHECKING, Literal, Protocol, Union
 
-from dashy.sensors.gpio_button import GPIOButton
+from dashy.displays import Display
 
 if TYPE_CHECKING:
     from PIL import Image
 
-from dashy.displays import Display
+    from dashy.sensors.gpio_button import GPIOButton
 
 
 class InkyBaseDisplay(Protocol):
@@ -37,15 +36,12 @@ InkyDisplay = Union[InkyMonoDisplay, InkyColourDisplay]
 
 
 class InkyBase(Display):
-    def __init__(self, *, saturation: float = 0.75) -> None:
-        self.saturation = saturation
+    buttons: dict[str, GPIOButton]
 
-        self.buttons = {
-            "A": GPIOButton(5),
-            "B": GPIOButton(6),
-            "C": GPIOButton(16),
-            "D": GPIOButton(24),
-        }
+    def __init__(self, device: InkyDisplay, *, saturation: float = 0.75) -> None:
+        self.device = device
+        self.buttons = {}
+        self.saturation = saturation
 
     async def start(self) -> None:
         await super().start()
@@ -56,11 +52,6 @@ class InkyBase(Display):
         await super().stop()
         for button in self.buttons.values():
             await button.stop()
-
-    @property
-    @abc.abstractmethod
-    def device(self) -> InkyDisplay:
-        ...
 
     @property
     def resolution(self) -> tuple[int, int]:
