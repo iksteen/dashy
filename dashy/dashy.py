@@ -6,11 +6,12 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Optional, TypeVar, cast
 
 from aiohttp import ClientSession
+from asyncpio import pi
 from playwright.async_api import Browser
 
 from dashy.displays.save_to_disk import SaveToDisk
 from dashy.services.aiohttp import AiohttpProvider
-from dashy.services.asyncpio import AsyncpioProvider, pi
+from dashy.services.asyncpio import AsyncpioProvider
 from dashy.services.playwright import PlaywrightProvider
 
 if TYPE_CHECKING:

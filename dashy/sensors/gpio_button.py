@@ -21,13 +21,13 @@ class GPIOButton(Button):
         self.callbacks: list[ButtonCallback] = []
 
     async def start(self, dashy: Dashy) -> None:
-        pi = await dashy.get_service(asyncpio.pi)  # type: ignore
+        pi = await dashy.get_service(asyncpio.pi)
 
-        await pi.set_mode(self.gpio, asyncpio.INPUT)  # type: ignore
-        await pi.set_pull_up_down(self.gpio, asyncpio.PUD_UP)  # type: ignore
+        await pi.set_mode(self.gpio, asyncpio.INPUT)
+        await pi.set_pull_up_down(self.gpio, asyncpio.PUD_UP)
         callback = await pi.callback(
             self.gpio,
-            edge=asyncpio.RISING_EDGE,  # type: ignore
+            edge=asyncpio.RISING_EDGE,
             func=self.emit,
         )
         self.cancel = callback.cancel

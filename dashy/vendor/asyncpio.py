@@ -1,5 +1,3 @@
-# type: ignore
-
 """
 asyncpio is a Python module for the Raspberry which talks to
 the pigpio daemon to allow control of the general purpose
