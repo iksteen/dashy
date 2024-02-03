@@ -59,9 +59,8 @@ class Dashy:
 
         await self.display.stop()
 
-        for t, provider in REGISTRY.items():
-            if t in self.services:
-                await provider.stop()
+        for t in self.services:
+            await REGISTRY[t].stop()
 
     async def render_loop(self, display: Display) -> None:
         self.last_dashboard = None
