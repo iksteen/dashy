@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from io import BytesIO
 from typing import TYPE_CHECKING, Literal, Optional, Union, cast
@@ -10,6 +11,7 @@ from bs4 import BeautifulSoup
 from defusedxml.ElementTree import fromstring as parse_xml
 from PIL import Image
 from playwright.async_api import Browser, Route
+from plexwebsocket import PlexWebsocket
 
 from dashy.dashboards import Dashboard
 
@@ -68,38 +70,50 @@ DEFAULT_TEMPLATE = """
 
 
 class PlexDashboard(Dashboard):
+    dashy: Dashy
     display: Display
     session: aiohttp.ClientSession
     browser: Browser
+    ws: PlexWebsocket
+    ws_task: asyncio.Task[None]
 
-    min_interval = 1
+    min_interval = None
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
         server: str,
         token: str,
         user: Optional[str] = None,
-        interval: int = 1,
         template: str = DEFAULT_TEMPLATE,
     ) -> None:
         self.server = server
         self.token = token
         self.user: Optional[str] = user
-        self.min_interval = interval
         self.template = template
         self.last_id: Optional[str] = None
 
     async def start(self, dashy: Dashy) -> None:
+        self.dashy = dashy
         self.display = dashy.display
         self.browser = await dashy.get_service(Browser)
         self.session = await dashy.get_service(aiohttp.ClientSession)
 
-    async def stop(self) -> None:
-        pass
+        self.ws = PlexWebsocket(self, self.callback, session=self.session)
+        self.ws_task = asyncio.create_task(self.ws.listen())
 
-    def get_plex_url(self, endpoint: str) -> str:
-        return f"{self.server}{endpoint}?X-Plex-Token={self.token}"
+    def callback(self, *_: str) -> None:
+        asyncio.get_event_loop().call_later(1.0, self.dashy.wakeup)
+
+    async def stop(self) -> None:
+        self.ws.close()
+        await self.ws_task
+
+    def url(self, endpoint: str, *, includeToken: bool = True) -> str:  # noqa: N803
+        url = f"{self.server}{endpoint}"
+        if includeToken:
+            url = f"{url}?X-Plex-Token={self.token}"
+        return url
 
     async def request(
         self,
@@ -108,7 +122,7 @@ class PlexDashboard(Dashboard):
         try:
             async with await self.session.request(
                 "GET",
-                self.get_plex_url(endpoint),
+                self.url(endpoint),
                 headers={
                     "Accept": "application/xml",
                 },
@@ -133,9 +147,9 @@ class PlexDashboard(Dashboard):
             player = session.find("Player")
             user = session.find("User")
             if (
-                player
+                player is not None
                 and player.get("state") == "playing"
-                and user
+                and user is not None
                 and user.get("title") == self.user
             ):
                 break
@@ -157,7 +171,7 @@ class PlexDashboard(Dashboard):
         async def handle_cover(route: Route) -> None:
             art = session.get("art")
             if art is not None:
-                image_url = self.get_plex_url(art)
+                image_url = self.url(art)
                 async with self.session.get(image_url) as r:
                     status = r.status
                     data = await r.read()

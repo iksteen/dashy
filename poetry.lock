@@ -1027,6 +1027,20 @@ greenlet = "3.0.3"
 pyee = "11.0.1"
 
 [[package]]
+name = "plexwebsocket"
+version = "0.0.14"
+description = "Support for issuing callbacks in response to Plex websocket updates."
+optional = false
+python-versions = "*"
+files = [
+    {file = "plexwebsocket-0.0.14-py3-none-any.whl", hash = "sha256:f00aa36a42908ca16a8c5a79ddbb99e9b9d98538636a41eb2666edcb85b6141c"},
+    {file = "plexwebsocket-0.0.14.tar.gz", hash = "sha256:f90c50c05e0cf2d824b9e3083ad77d843d8ef9d4e80c01ed34181c2ef094f80b"},
+]
+
+[package.dependencies]
+aiohttp = "*"
+
+[[package]]
 name = "pre-commit"
 version = "3.6.0"
 description = "A framework for managing and maintaining multi-language pre-commit hooks."
@@ -1444,4 +1458,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "9e41bb4e94e7e75f13608f5e5cc9a1fa9d768a7dfcea026fa228090bc6fd6418"
+content-hash = "795885ecd829ce8d6dbef2a293910910ba43ba836d5513fb15749c4c6f8397fd"
