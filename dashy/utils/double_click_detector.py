@@ -28,7 +28,7 @@ class DoubleClickDetector:
     async def __call__(self) -> None:
         async def emit(callbacks: list[ButtonCallback], *, delay: bool = False) -> None:
             if delay:
-                await asyncio.sleep(0.25)
+                await asyncio.sleep(0.5)
                 self._timeout = None
 
             for callback in callbacks:
