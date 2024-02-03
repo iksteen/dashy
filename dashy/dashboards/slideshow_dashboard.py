@@ -6,6 +6,7 @@ from typing import Literal, Optional, Union
 from PIL import Image
 
 from dashy.dashboards import Dashboard
+from dashy.dashy import Dashy
 from dashy.displays import Display
 from dashy.utils.resize_image import resize_image
 
@@ -43,8 +44,8 @@ class SlideshowDashboard(Dashboard):
                 self.file_list.append(file)
         random.shuffle(self.file_list)
 
-    async def start(self, display: Display) -> None:
-        self.display = display
+    async def start(self, dashy: Dashy) -> None:
+        self.display = dashy.display
 
     async def stop(self) -> None:
         pass

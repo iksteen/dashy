@@ -2,89 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 import sys
-from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any
 
 from dotenv import load_dotenv
 
-if TYPE_CHECKING:
-    from dashy.dashboards import Dashboard
-    from dashy.displays import Display
-
-
-class Dashy:
-    def __init__(self) -> None:
-        self.display: Optional[Display] = None
-        self.sleep_task: Optional[asyncio.Task[None]] = None
-        self.last_dashboard: Optional[Dashboard] = None
-        self.dashboards: list[Dashboard] = []
-        self.skip_sleep = False
-
-    async def run(self) -> None:
-        if self.display is None:
-            msg = "No display were configured"
-            raise RuntimeError(msg)
-
-        await self.display.start()
-        try:
-            await self.render_loop(self.display)
-        finally:
-            await self.display.stop()
-
-    async def render_loop(self, display: Display) -> None:
-        started_dashboards = []
-        try:
-            self.last_dashboard = None
-
-            while True:
-                pause_time = math.inf
-
-                for dashboard in self.dashboards:
-                    if dashboard not in started_dashboards:
-                        await dashboard.start(display)
-                        started_dashboards.append(dashboard)
-
-                    result = await dashboard.next(
-                        force=self.last_dashboard is not dashboard
-                    )
-                    min_interval = dashboard.min_interval
-                    if min_interval is not None:
-                        pause_time = min(pause_time, min_interval)
-
-                    if result == "SKIP":
-                        continue
-
-                    self.last_dashboard = dashboard
-                    if result is not None:
-                        await display.show_image(result)
-                    break
-                else:
-                    self.last_dashboard = None
-
-                if not self.skip_sleep:
-                    self.sleep_task = asyncio.create_task(asyncio.sleep(pause_time))
-                    with suppress(asyncio.CancelledError):
-                        await self.sleep_task
-                    self.sleep_task = None
-                else:
-                    self.skip_sleep = False
-
-        finally:
-            for dashboard in reversed(started_dashboards):
-                await dashboard.stop()
-
-    def wakeup(self, *, force: bool = False) -> None:
-        if force:
-            self.last_dashboard = None
-
-        if self.sleep_task is not None:
-            self.sleep_task.cancel()
-        else:
-            self.skip_sleep = True
-
+from dashy.dashy import Dashy
 
 if __name__ == "__main__":
     load_dotenv()
@@ -100,4 +24,8 @@ if __name__ == "__main__":
     loglevel = conf_globals.get("LOGLEVEL", logging.INFO)
     logging.basicConfig(level=loglevel)
 
-    asyncio.run(dashy.run())
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(dashy.run())
+    except KeyboardInterrupt:
+        loop.run_until_complete(dashy.stop())
