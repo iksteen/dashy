@@ -9,12 +9,12 @@ import aiohttp
 from bs4 import BeautifulSoup
 from defusedxml.ElementTree import fromstring as parse_xml
 from PIL import Image
-from playwright.async_api import Browser, Playwright, Route
-from playwright.async_api import async_playwright as playwright
+from playwright.async_api import Browser, Route
 
 from dashy.dashboards import Dashboard
 
 if TYPE_CHECKING:
+    from dashy.dashy import Dashy
     from dashy.displays import Display
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,6 @@ DEFAULT_TEMPLATE = """
 class PlexDashboard(Dashboard):
     display: Display
     session: aiohttp.ClientSession
-    playwright: Playwright
     browser: Browser
 
     min_interval = 1
@@ -91,16 +90,13 @@ class PlexDashboard(Dashboard):
         self.template = template
         self.last_id: Optional[str] = None
 
-    async def start(self, display: Display) -> None:
-        self.display = display
-        self.session = aiohttp.ClientSession()
-        self.playwright = await playwright().start()
-        self.browser = await self.playwright.chromium.launch()
+    async def start(self, dashy: Dashy) -> None:
+        self.display = dashy.display
+        self.browser = await dashy.get_service(Browser)
+        self.session = await dashy.get_service(aiohttp.ClientSession)
 
     async def stop(self) -> None:
-        await self.browser.close()
-        await self.playwright.stop()
-        await self.session.close()
+        pass
 
     def get_plex_url(self, endpoint: str) -> str:
         return f"{self.server}{endpoint}?X-Plex-Token={self.token}"

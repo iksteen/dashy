@@ -8,6 +8,7 @@ from dashy.displays import Display
 if TYPE_CHECKING:
     from PIL import Image
 
+    from dashy.dashy import Dashy
     from dashy.sensors.gpio_button import GPIOButton
 
 
@@ -43,10 +44,10 @@ class InkyBase(Display):
         self.buttons = {}
         self.saturation = saturation
 
-    async def start(self) -> None:
-        await super().start()
+    async def start(self, dashy: Dashy) -> None:
+        await super().start(dashy)
         for button in self.buttons.values():
-            await button.start()
+            await button.start(dashy)
 
     async def stop(self) -> None:
         await super().stop()

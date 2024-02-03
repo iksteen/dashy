@@ -3,12 +3,12 @@ from typing import Literal, Optional, Union
 
 from PIL import Image
 
-from dashy.displays import Display
+from dashy.dashy import Dashy
 
 
 class Dashboard(abc.ABC):
     @abc.abstractmethod
-    async def start(self, display: Display) -> None:
+    async def start(self, dashy: Dashy) -> None:
         ...
 
     @abc.abstractmethod

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
@@ -12,12 +11,12 @@ import aiohttp
 from aiohttp import BasicAuth
 from bs4 import BeautifulSoup
 from PIL import Image
-from playwright.async_api import Browser, Playwright, Route
-from playwright.async_api import async_playwright as playwright
+from playwright.async_api import Browser, Route
 
 from dashy.dashboards import Dashboard
 
 if TYPE_CHECKING:
+    from dashy.dashy import Dashy
     from dashy.displays import Display
 
 logger = logging.getLogger(__name__)
@@ -74,7 +73,6 @@ class SpotifyDashboard(Dashboard):
     credentials: dict[str, Any]
     display: Display
     session: aiohttp.ClientSession
-    playwright: Playwright
     browser: Browser
 
     min_interval = 1
@@ -91,7 +89,7 @@ class SpotifyDashboard(Dashboard):
         self.template = template
         self.last_id = None
 
-    async def start(self, display: Display) -> None:
+    async def start(self, dashy: Dashy) -> None:
         try:
             async with aiofiles.open(self.credential_path) as f:
                 self.credentials = json.loads(await f.read())
@@ -99,15 +97,12 @@ class SpotifyDashboard(Dashboard):
             logger.exception("Invalid or missing spotify credentials")
             self.credentials = {}
 
-        self.display = display
-        self.session = aiohttp.ClientSession()
-        self.playwright = await playwright().start()
-        self.browser = await self.playwright.chromium.launch()
+        self.display = dashy.display
+        self.session = await dashy.get_service(aiohttp.ClientSession)
+        self.browser = await dashy.get_service(Browser)
 
     async def stop(self) -> None:
-        await self.browser.close()
-        await self.playwright.stop()
-        await self.session.close()
+        pass
 
     async def get_token(self) -> str:
         if self.credentials["expires"] < time.time():
@@ -223,21 +218,3 @@ class SpotifyDashboard(Dashboard):
             return Image.open(BytesIO(image_data))
         finally:
             await page.close()
-
-
-if __name__ == "__main__":
-    from dotenv import load_dotenv
-
-    from dashy.displays.save_to_disk import SaveToDisk
-
-    load_dotenv()
-    display = SaveToDisk()
-
-    async def main() -> None:
-        dashboard = SpotifyDashboard()
-        await dashboard.start(display)
-        image = await dashboard.next(force=True)
-        await display.show_image(image)
-        await dashboard.stop()
-
-    asyncio.run(main())
