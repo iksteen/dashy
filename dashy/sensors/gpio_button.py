@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
 
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class GPIOButton(Button):
     def __init__(self, gpio: int) -> None:
+        self.settled = False
         self.gpio = gpio
         self.cancel: Optional[Callable[[], Awaitable[None]]] = None
         self.callbacks: list[ButtonCallback] = []
@@ -29,6 +31,10 @@ class GPIOButton(Button):
             func=self.emit,
         )
         self.cancel = callback.cancel
+        asyncio.get_event_loop().call_later(0.25, self.set_settled)
+
+    def set_settled(self) -> None:
+        self.settled = True
 
     async def stop(self) -> None:
         if self.cancel:
@@ -44,6 +50,9 @@ class GPIOButton(Button):
             self.callbacks.remove(f)
 
     async def emit(self, _: Any, __: Any, ___: Any) -> None:
+        if not self.settled:
+            return
+
         for callback in self.callbacks:
             try:
                 await callback()
