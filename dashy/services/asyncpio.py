@@ -1,14 +1,14 @@
 from dashy.services import ServiceProvider
-from dashy.vendor.asyncpio import pi
+from dashy.vendor import asyncpio
 
 
-class AsyncpioProvider(ServiceProvider[pi]):
-    _pi: pi
+class AsyncpioProvider(ServiceProvider[asyncpio.pi]):
+    pi: asyncpio.pi
 
-    async def start(self) -> pi:
-        self._pi = pi()
-        await self._pi.connect()
-        return self._pi
+    async def start(self) -> asyncpio.pi:
+        self.pi = asyncpio.pi()
+        await self.pi.connect()
+        return self.pi
 
     async def stop(self) -> None:
-        await self._pi.stop()
+        await self.pi.stop()
